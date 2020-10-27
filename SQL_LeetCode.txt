@@ -1,0 +1,429 @@
+All the code are written under MySQL environment
+
+
+
+Date: 05/13/2020
+Author: Jinxin Xia
+
+
+******************************************************************************************
+1126. Active Business
+
+Find the business that has more than one business event and with more than average occurence in that event.
+
+
+select business_id
+from Events a
+inner join
+(
+select event_type,avg(occurences) as mean
+from Events
+group by event_type
+) b
+on a.event_type=b.event_type and a.occurences > b.mean
+group by business_id
+having count(business_id)>=2
+
+In this question, we use inner join(intersect in a mathematical way) to get the id.
+
+
+*********************************************************************************************************
+614. Second Degree Follower
+
+Find the number of follower's follower if they have one
+
+select
+    followee as follower,
+    count(distinct follower) as num
+from
+    follow
+where
+    followee in (select follower from follow)
+group by
+    followee
+order by
+    follower
+
+This method   ????
+
+
+Select f1.follower as follower, count(distinct(f2.follower)) as num
+From follow f1 INNER JOIN follow f2 ON f1.follower = f2.followee
+Group By f1.follower
+
+This is the inner join way to solve the problem.
+
+
+
+*********************************************************************************************************
+177. Nth Highest Salary
+
+Get the Nth Highest Salary from table Employee
+
+
+select salary from (
+        select distinct salary, 
+              DENSE_RANK() over (order by salary desc) as row_num
+        from Employee) temp
+        where row_num=N
+
+
+DENSE_RANK() OVER (
+    PARTITION BY <expression>[{,<expression>...}]
+    ORDER BY <expression> [ASC|DESC], [{,<expression>...}]
+)
+
+First, the PARTITION BY clause divides the result sets produced by the FROM clause into partitions. 
+The DENSE_RANK() function is applied to each partition.
+Second, the ORDER BY  clause specifies the order of rows in each partition on which the 
+DENSE_RANK() function operates.
+
+
+*********************************************************************************************************
+176. Second Highest Salary
+
+
+select ifnull((
+SELECT Salary as SecondHighestSalary
+From (
+ select distinct Salary,
+    DENSE_RANK() OVER (order by Salary desc) as salary_rank
+    from Employee
+) b
+where salary_rank = 2),null)  as SecondHighestSalary
+
+ifnull(not null output, null output)
+
+
+Select IFNULL((
+Select DISTINCT(Salary) AS SecondHighestSalary
+from Employee
+ORDER BY Salary DESC
+LIMIT 1,1), NULL) AS SecondHighestSalary
+
+
+limit 1,1 or limit 1 offset 1 (means ignore the first 1 and begin with the second and output one entry)
+
+
+*********************************************************************************************************
+*********************************************************************************************************
+262. Trips and Users 
+
+select request_at as day, round(avg(case when status like '%cancelled%' then 1 else 0 end),2) as 'cancellation Rate'
+from trips as t
+join users as u1 on t.client_id=u1.users_id
+join users as u2 on t.driver_id=u2.users_id
+where u1.banned='no' and u2.banned='no'
+group by day
+having day between '2013-10-01' and '2013-10-03'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Date: 05/14/2020
+Author: Jinxin Xia
+
+*********************************************************************************************************
+185. Department Top Three Salaries
+
+
+select department.name as Department, b.name as Employee, b.salary as Salary from
+(select departmentid, name, salary from
+(select departmentid, name, salary, dense_rank()
+over (partition by departmentid order by salary desc) as salary_rank
+from employee order by departmentid) a
+where a.salary_rank <= 3) b
+join department on b.departmentid = department.id
+
+
+dense_rank() over(partition by * order by*) is extremely useful for any ranking problem.
+
+
+*********************************************************************************************************
+*********************************************************************************************************
+1132. Reported Posts II
+
+select round(avg(perc),2) as average_daily_percent from
+(select
+count(distinct b.post_id)/count(distinct a.post_id)*100 as perc
+from Actions a
+left join Removals b
+on a.post_id=b.post_id
+where extra='spam'
+group by action_date) as a
+
+
+Review this carefully.
+
+
+*********************************************************************************************************
+1142. User Activity fro the Past 30 Days II 
+
+SELECT IFNULL(ROUND(COUNT(DISTINCT(session_id)) / COUNT(DISTINCT(user_id)), 2), 0) AS average_sessions_per_user
+FROM Activity
+WHERE DATEDIFF('2019-07-27', activity_date) < 30 
+
+use ifnull(output non null, put null) to detect any possible valiation of mathematical rules.
+
+
+*********************************************************************************************************
+184. Department Highest Salary
+Find the department highest salary in two tables
+
+
+select b.Name as Department, a.Name as Employee, Salary
+from (
+select *, max(Salary) over(partition by DepartmentId) as max_val
+from Employee
+) a
+join Department b
+on a.DepartmentId = b.Id
+where Salary = max_val
+
+New clause max(*) over(partition by *)
+
+
+*********************************************************************************************************
+*********************************************************************************************************
+579. Find Cumulative Salary of an Employee
+
+This is a new type of question asking about cumulating the monthly salary by each month.
+
+
+SELECT t1.Id, t1.Month, SUM(e.Salary) AS Salary
+FROM
+    (SELECT Id, Month,Salary
+    FROM Employee
+    WHERE (Id,Month) NOT IN (SELECT Id, MAX(Month) FROM Employee GROUP BY Id)) t1
+JOIN Employee e
+ON t1.Id=e.Id AND t1.Month-e.Month BETWEEN 0 AND 2
+GROUP BY 1,2
+ORDER BY 1 ASC, 2 DESC
+
+There are two 'select' clauses inside the 'from' part amazingly new to me. 
+
+
+
+
+
+
+
+
+Date: 05/15/2020
+Author: Jinxin Xia
+
+*********************************************************************************************************
+596. Classes More Than 5 Students
+
+select class
+from courses
+group by class
+having count(distinct student) >= 5
+
+
+Switch target to achieve goals.
+
+
+
+*********************************************************************************************************
+197. Rising Temperature
+
+select w2.Id 
+from Weather w1 
+join Weather w2 
+where w1.RecordDate + interval 1 day=w2.RecordDate and w1.Temperature<w2.Temperature
+
+In this problem, it use join to merge tables and interval 1 day to add one day.
+
+
+*********************************************************************************************************
+578. Get Highest Answer Rate Question
+
+select question_id as survey_log
+from survey_log
+group by question_id
+order by count(answer_id)/count(if(action = 'show',1,0)) desc
+limit 1
+
+if(statement, true, false)               group by and order by combined can do operation for the specifc variable
+
+
+*********************************************************************************************************
+180. Consecutive Numberrs
+
+select distinct num as ConsecutiveNums 
+from
+(select num, lag(num,1) over (order by id) num1, lag(num,2) over (order by id) num2 from logs) a 
+where num=num1 and num1 = num2
+
+lag(*,#) gives access to previous row by # rows
+
+
+*********************************************************************************************************
+196. Delete Duplicate Emails
+
+delete b
+from Person a, Person b
+where a.Email = b.Email
+and a.Id < b.Id
+
+delete 
+
+
+
+
+
+Date: 05/19/2020
+Author: Jinxin Xia
+
+
+*********************************************************************************************************
+1050. Actors and Directors Who Cooperrated At Least Three Times
+
+SELECT actor_id, director_id
+FROM ActorDirector
+GROUP BY actor_id, director_id
+HAVING COUNT(*) >= 3;
+
+understand  group by *,* 
+
+
+*********************************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+Date: 05/21/2020
+Author: Jinxin Xia
+
+
+
+********************************************************************************************************
+1141. User Activity for the Past 30 Days I
+
+select activity_date as day, count(distinct(user_id)) as active_users 
+from activity 
+group by activity_date
+having '2019-06-28' <= activity_date and activity_date <= '2019-07-27'
+
+
+Notice: In SQL we cannot use 11 <= * <= 14 expersion but use 11 <= * and * <= 14
+
+
+********************************************************************************************************
+********************************************************************************************************
+1454. Active Users
+
+Find users that have five or more consecutive day login.
+
+select distinct a.id, (select name from Accounts where id=a.id) name
+from Logins a, Logins b
+where a.id = b.id and datediff(a.login_date,b.login_date) between 1 and 4
+group by a.id, a.login_date
+having count(distinct b.login_date) = 4
+
+
+put select into select to get 
+
+
+
+********************************************************************************************************
+1355. Activity Participants
+
+Find the activities that with neither the maximum or minimum number of participants.
+
+select distinct a.activity 
+from(
+    select activity, count(id) counts
+    from friends 
+    group by 1) a
+ join 
+    (select max(id) max_cnt, min(id) min_cnt
+    from(
+    select activity, count(id) id
+    from friends
+    group by activity )t) b
+on a.counts <> b.max_cnt and a.counts<> b.min_cnt
+
+select within select and within select
+
+
+
+********************************************************************************************************
+1322. Ads Performance
+
+
+select ad_id,round(ifnull(100*(sum(if(action='Clicked',1,0))/
+sum(if(action='Clicked' or action='Viewed',1,0))),0),2) as ctr
+from Ads
+group by ad_id
+order by ctr desc, ad_id asc
+
+
+
+
+
+
+
+
+
+
+Date: 05/29/2020
+Author: Jinxin Xia
+
+
+
+********************************************************************************************************
+1351. Students With Invalid Departments
+
+
+
+
+
+
+
+
+Date: 06/06/2020
+Author: Jinxin Xia
+
+
+
+********************************************************************************************************
+1350. Students With Invalid Departments
+
+get student's name and id from students table where the departments they enrolled in are no longer existed.
+
+select id, name
+from Students
+where department_id not in 
+(select id from Departments)
+
+
+
+
+
+
+
+
+
